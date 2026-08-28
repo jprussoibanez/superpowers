@@ -7,13 +7,13 @@ description: Use when you have a spec or requirements for a multi-step task, bef
 
 ## Overview
 
-Write comprehensive implementation plans assuming the engineer has zero context for our codebase and questionable taste. Document everything they need to know: which files to touch for each task, code, testing, docs they might need to check, how to test it. Give them the whole plan as bite-sized tasks. DRY. YAGNI. TDD. Frequent commits.
+Write comprehensive implementation plans assuming the engineer has zero context for our codebase and questionable taste. Document everything they need to know: which files to touch for each task, code, testing, docs they might need to check, how to test it. Give them the whole plan as bite-sized tasks. DRY. YAGNI. TDD. NO commits.
 
 Assume they are a skilled developer, but know almost nothing about our toolset or problem domain. Assume they don't know good test design very well.
 
 **Announce at start:** "I'm using the writing-plans skill to create the implementation plan."
 
-**Context:** If working in an isolated worktree, it should have been created via the `superpowers:using-git-worktrees` skill at execution time.
+**Context:** This should be run on the feature branch provided by the user. If no feature branch is provided, ask the user for one. DO NOT create a branch yourself.
 
 **Save plans to:** `docs/superpowers/plans/YYYY-MM-DD-<feature-name>.md`
 - (User preferences for plan location override this default)
@@ -49,7 +49,6 @@ independently testable deliverable.
 - "Run it to make sure it fails" - step
 - "Implement the minimal code to make the test pass" - step
 - "Run the tests and make sure they pass" - step
-- "Commit" - step
 
 ## Plan Document Header
 
@@ -76,6 +75,17 @@ naming and copy rules, platform requirements — one line each, with exact
 values copied verbatim from the spec. Every task's requirements implicitly
 include this section.]
 
+**If C4 diagrams are warranted (see C4 Diagram Assessment section), insert this section immediately after the `---` divider:**
+
+```markdown
+# Architecture Overview
+
+[Brief description of the architecture and the diagrams below]
+
+## Architecture Diagrams
+
+[diagrams from superpowers:drawing-c4-diagrams]
+
 ---
 ```
 
@@ -97,10 +107,54 @@ include this section.]
 
 - [ ] **Step 1: Write the failing test**
 
+MUST follow the test implementation best practices defined in [best_practices.md](best_practices.md#test-implementation-best-practices).
+
 ```python
-def test_specific_behavior():
-    result = function(input)
-    assert result == expected
+class TestSpecificBehavior:
+    @staticmethod
+    def arrange_fixture(context: InputType) -> FixtureType:
+        """Arrange a test fixture from context.
+        
+        Parameters
+        ----------
+        context : InputType
+            The context to use for the test.
+        
+        Returns
+        -------
+        FixtureType
+            The test fixture.
+        """
+        return fixture
+
+    @staticmethod
+    def assert_result_equals_expected(result: ResultType, expected: ResultType) -> None:
+        """Assert result matches the expected value.
+        
+        Parameters
+        ----------
+        result : ResultType
+            The result to check.
+        expected : ResultType
+            The expected result.
+        """
+        assert result == expected, f"Expected {expected}, got {result}"
+
+    def test_specific_behavior(self) -> None:
+        """Test the specific behavior of the function.
+
+        Given <context>
+        When <action>
+        Then <expected result>
+        """
+        # Arrange
+        fixture = self.arrange_fixture(context)
+
+        # Act
+        result = function(fixture)
+
+        # Assert
+        self.assert_result_equals_expected(result, expected)
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -110,8 +164,33 @@ Expected: FAIL with "function not defined"
 
 - [ ] **Step 3: Write minimal implementation**
 
+MUST follow the task implementation best practices defined in [best_practices.md](best_practices.md#task-implementation-best-practices).
+
 ```python
-def function(input):
+def function(input: InputType) -> OutputType:
+    """
+    Function description
+
+    Examples
+    --------
+    >>> function(input)
+    expected
+
+    Parameters
+    ----------
+    input : InputType
+        Description
+
+    Returns
+    -------
+    OutputType
+        Description
+
+    Raises
+    ------
+    ExceptionType
+        Description
+    """
     return expected
 ```
 
@@ -120,12 +199,6 @@ def function(input):
 Run: `pytest tests/path/test.py::test_name -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
-
-```bash
-git add tests/path/test.py src/path/file.py
-git commit -m "feat: add specific feature"
-```
 ````
 
 ## No Placeholders
@@ -137,6 +210,15 @@ Every step must contain the actual content an engineer needs. These are **plan f
 - "Similar to Task N" (repeat the code — the engineer may be reading tasks out of order)
 - Steps that describe what to do without showing how (code blocks required for code steps)
 - References to types, functions, or methods not defined in any task
+
+## Remember
+- Exact file paths always
+- Complete code in every step — if a step changes code, show the code
+- Exact commands with expected output
+- DRY, YAGNI, TDD
+- Provide examples to docstrings that demonstrate usage when it helps.
+- Do not add any code comments in the code (extract it to docstrings if needed).
+- DO NOT commit any changes with git. The user will commit changes after reviewing the plan.
 
 ## Self-Review
 
@@ -150,9 +232,36 @@ After writing the complete plan, look at the spec with fresh eyes and check the 
 
 If you find issues, fix them inline. No need to re-review — just fix and move on. If you find a spec requirement with no task, add the task.
 
+## C4 Diagram Assessment
+
+After completing the self-review, decide whether C4 architecture diagrams add value for this plan.
+
+**Generate diagrams when:**
+- 3+ files with non-trivial interdependencies
+- New class hierarchy, service boundary, or module interface introduced
+- Database, external API, or messaging system involved
+- Runtime flow involves 3 or more distinct participants
+
+**Skip diagrams when:**
+- Plan touches 1–2 files with straightforward changes
+- No new structural relationships are introduced
+- Diagrams were already generated at the brainstorming/spec stage and the architecture is unchanged
+
+**If warranted:** **REQUIRED SUB-SKILL:** Invoke `superpowers:drawing-c4-diagrams`. Pass the completed plan content. The skill generates Container + Component + Sequence diagrams and returns an `## Architecture Diagrams` block. Insert it into the `# Architecture Overview` section of the plan (immediately after the header `---` divider).
+
+If not warranted, proceed silently to Execution Handoff.
+
 ## Execution Handoff
 
-After saving the plan, offer execution choice:
+After saving the plan, offer the following choices to the user in order:
+
+### User story creation
+
+Ask the user if they want a user story written for the plan. If the user says yes, then invoke the `skills/writing-user-story` passing the plan file as input.
+
+### Execution method
+
+After the user story is written (or skipped), offer the user the choice of execution method.
 
 **"Plan complete and saved to `docs/superpowers/plans/<filename>.md`. Two execution options:**
 
